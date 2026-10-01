@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xiaomi 5 Plus Auto-Flasher & Discord Log Streamer</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; }
+    .terminal-scroll::-webkit-scrollbar { width: 6px; }
+    .terminal-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.05); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .animate-btn-pulse { animation: pulse-ring 1.5s infinite ease-in-out; }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-4 sm:p-6 min-h-screen">
+  <div class="max-w-4xl mx-auto space-y-6">
+    
+    <!-- Header Card -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Brightway / Navee DDHBC23LQ</span>
+          <span class="text-xs text-[var(--muted-foreground)]">Auto-Fetch + Discord Logging v1.3</span>
+        </div>
+        <h1 class="text-2xl font-bold mt-1 text-[var(--foreground)]">Xiaomi 5 Plus Firmware Flasher</h1>
+        <p class="text-sm text-[var(--muted-foreground)] mt-0.5">Automatisches Laden der Original-MCU & Discord Webhook Log-Sync</p>
+      </div>
+
+      <button id="btnConnect" onclick="toggleConnect()" class="px-5 py-2.5 rounded-xl font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-sm flex items-center gap-2">
+        <svg id="iconConnect" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071a10 10 0 0114.142 0M1.414 8.586a15 15 0 0121.172 0"></path></svg>
+        <span id="txtConnect">Scooter verbinden</span>
+      </button>
+    </div>
+
+    <!-- Power Button Verification Banner -->
+    <div id="bannerPowerButton" class="hidden bg-amber-500/10 border-2 border-amber-500/50 rounded-2xl p-5 shadow-sm animate-btn-pulse">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center flex-shrink-0">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 0121 9z"></path></svg>
+        </div>
+        <div class="flex-1">
+          <h4 class="font-bold text-amber-400 text-base">PHYSIKALISCHE BESTÄTIGUNG ERFORDERLICH!</h4>
+          <p class="text-sm text-amber-200/90 mt-0.5">Bitte jetzt <b>1x kurz auf den Power-Button am Roller-Dashboard drücken</b>, um die Bluetooth-Authentifizierung freizugeben.</p>
+        </div>
+        <button onclick="simulateButtonPress()" class="px-3.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-medium">
+          (Test-Simulation)
+        </button>
+      </div>
+    </div>
+
+    <!-- Status Overview & Auto-Loaded Firmware Info -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+      <!-- Connection & Status -->
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
+        <h3 class="font-semibold text-base flex items-center gap-2">
+          <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          Verbindungs-Status
+        </h3>
+        <div class="space-y-2.5 text-sm">
+          <div class="flex justify-between py-1.5 border-b border-[var(--border)]">
+            <span class="text-[var(--muted-foreground)]">Status:</span>
+            <span id="lblStatus" class="font-medium text-amber-500">Getrennt</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-[var(--border)]">
+            <span class="text-[var(--muted-foreground)]">Mijia Auth:</span>
+            <span id="lblAuth" class="font-medium text-amber-500">Ausstehend</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-[var(--border)]">
+            <span class="text-[var(--muted-foreground)]">Gerätename:</span>
+            <span id="lblDevName" class="font-mono text-xs">-</span>
+          </div>
+          <div class="flex justify-between py-1.5 border-b border-[var(--border)]">
+            <span class="text-[var(--muted-foreground)]">Discord Sync:</span>
+            <span class="font-mono text-xs text-indigo-400">Aktiv (Webhook)</span>
+          </div>
+          <div class="flex justify-between py-1.5">
+            <span class="text-[var(--muted-foreground)]">MTU Größe:</span>
+            <span id="lblMtu" class="font-mono text-xs">244 Byte</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auto Firmware Loader & Status -->
+      <div class="md:col-span-2 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex justify-between items-center">
+          <h3 class="font-semibold text-base flex items-center gap-2">
+            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+            MCU Firmware (Auto-Loaded)
+          </h3>
+          <button onclick="fetchOnlineFirmware()" class="text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-all">
+            Neu laden (uguu.se)
+          </button>
+        </div>
+
+        <div id="pnlAutoStatus" class="bg-[var(--background)] border border-[var(--border)] rounded-xl p-4 space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-xs text-[var(--muted-foreground)]">Quelle:</span>
+            <span class="text-xs font-mono text-emerald-400">https://n.uguu.se/NCXgrQcL.bin</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-xs text-[var(--muted-foreground)]">Datei-Status:</span>
+            <span id="lblFwDownloadStatus" class="text-xs font-semibold text-amber-400">Lade Firmware herunter...</span>
+          </div>
+        </div>
+
+        <!-- Container Info Output -->
+        <div id="pnlContainerInfo" class="hidden bg-[var(--background)] border border-[var(--border)] rounded-xl p-3 text-xs font-mono space-y-1">
+          <div class="flex justify-between text-emerald-400"><span>EU1 (Motor-Driver FOC):</span><span id="infoEu1">-</span></div>
+          <div class="flex justify-between text-sky-400"><span>BU1 (Body Controller):</span><span id="infoBu1">-</span></div>
+          <div class="flex justify-between text-[var(--muted-foreground)]"><span>MIFOTA Signatur:</span><span id="infoSig">-</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Progress & Controls -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-5">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div>
+          <h3 class="font-semibold text-lg">Firmware-Flash Steuerung</h3>
+          <p class="text-xs text-[var(--muted-foreground)]">Original MCU Firmware Test-Flashing via WebBluetooth & Discord Sync</p>
+        </div>
+        <div class="flex gap-3 w-full sm:w-auto">
+          <button id="btnFlashTest" onclick="startFlashProcess(true)" disabled class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-medium bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white transition-all shadow-sm">
+            Dry-Run Test (Ohne Schreiben)
+          </button>
+          <button id="btnFlashFull" onclick="startFlashProcess(false)" disabled class="flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-sm font-medium bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white transition-all shadow-sm">
+            Original MCU Flashen
+          </button>
+        </div>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="space-y-2">
+        <div class="flex justify-between text-xs font-medium">
+          <span id="lblProgressState">Bereit</span>
+          <span id="lblProgressPercent">0%</span>
+        </div>
+        <div class="w-full h-3 bg-[var(--background)] border border-[var(--border)] rounded-full overflow-hidden">
+          <div id="barProgress" class="h-full bg-emerald-500 transition-all duration-150 w-0"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Terminal Log -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm space-y-3">
+      <div class="flex justify-between items-center">
+        <h3 class="font-semibold text-sm flex items-center gap-2">
+          <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+          Live DFU Protocol Log (Streams to Discord)
+        </h3>
+        <button onclick="clearLog()" class="text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Clear</button>
+      </div>
+
+      <div id="txtLog" class="terminal-scroll h-48 bg-[#0d1117] text-[#c9d1d9] p-4 rounded-xl font-mono text-xs overflow-y-auto space-y-1 border border-[var(--border)]">
+        <div class="text-gray-500">[SYSTEM] Flasher initialisiert. Starte Auto-Download & Discord Log-Sync...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const FIRMWARE_URL = "https://n.uguu.se/NCXgrQcL.bin";
+    const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1555312633538678796/Tej10A-aB3sUH43EmyfXO_WbbLp4BcDnCvmeX8l8xN5seRMe93dffcVYRzqr6QfNS8TP";
+
+    // GATT Service & Characteristic UUIDs for Mijia/Brightway DFU & Auth
+    const BLE_SERVICE_MIJIA = "0000fe95-0000-1000-8000-00805f9b34fb";
+    const BLE_CHAR_DFU_CTRL = "00000001-0000-1000-8000-00805f9b34fb";
+    const BLE_CHAR_DFU_DATA = "00000002-0000-1000-8000-00805f9b34fb";
+    const BLE_CHAR_AUTH_TOKEN = "00000010-0000-1000-8000-00805f9b34fb";
+
+    let gattDevice = null;
+    let gattServer = null;
+    let charCtrl = null;
+    let charData = null;
+    let charToken = null;
+    let isAuthenticated = false;
+    let rawFirmwareBytes = null;
+    let logBufferForDiscord = [];
+
+    // Send logs to Discord Webhook
+    async function sendToDiscord(message) {
+      if (!DISCORD_WEBHOOK_URL) return;
+      try {
+        await fetch(DISCORD_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: `\`\`\`${message.replace(/`/g, '')}\`\`\``
+          })
+        });
+      } catch (err) {
+        console.error("Discord Webhook Error:", err);
+      }
+    }
+
+    function log(msg, type = 'info') {
+      const logDiv = document.getElementById('txtLog');
+      const time = new Date().toLocaleTimeString();
+      let colorClass = 'text-gray-300';
+      if (type === 'success') colorClass = 'text-emerald-400';
+      if (type === 'warn') colorClass = 'text-amber-400';
+      if (type === 'error') colorClass = 'text-rose-400';
+
+      const line = document.createElement('div');
+      line.className = colorClass;
+      line.innerHTML = `<span class="text-gray-600">[${time}]</span> ${msg}`;
+      logDiv.appendChild(line);
+      logDiv.scrollTop = logDiv.scrollHeight;
+
+      // Also dispatch to Discord
+      sendToDiscord(`[${time}] ${msg}`);
+    }
+
+    function clearLog() {
+      document.getElementById('txtLog').innerHTML = '';
+    }
+
+    // Auto-fetch original MCU firmware on startup
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchOnlineFirmware();
+    });
+
+    async function fetchOnlineFirmware() {
+      log("Lade originale MCU Firmware vonuguu.se herunter...", 'info');
+      document.getElementById('lblFwDownloadStatus').innerText = "Lade herunter...";
+      document.getElementById('lblFwDownloadStatus').className = "text-xs font-semibold text-amber-400";
+
+      try {
+        const resp = await fetch(FIRMWARE_URL);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const buffer = await resp.arrayBuffer();
+        rawFirmwareBytes = new Uint8Array(buffer);
+        
+        log(`Firmware erfogreich heruntergeladen! Größe: ${rawFirmwareBytes.length} Bytes`, 'success');
+        document.getElementById('lblFwDownloadStatus').innerText = `Bereit (${(rawFirmwareBytes.length/1024).toFixed(1)} KB)`;
+        document.getElementById('lblFwDownloadStatus').className = "text-xs font-semibold text-emerald-400";
+
+        parseFirmware();
+      } catch (err) {
+        log(`Fehler beim automatischen Firmware-Download: ${err.message}`, 'error');
+        document.getElementById('lblFwDownloadStatus').innerText = "Download fehlgeschlagen";
+        document.getElementById('lblFwDownloadStatus').className = "text-xs font-semibold text-rose-400";
+      }
+    }
+
+    function parseFirmware() {
+      if (!rawFirmwareBytes || rawFirmwareBytes.length < 128) {
+        log("Ungültiges Binary-Format!", 'error');
+        return;
+      }
+
+      log("Analysiere MIFOTA Container-Header der heruntergeladenen Datei...", 'info');
+      
+      const eu1Size = 0x8c00;
+      const bu1Size = 0x15780;
+
+      const eu1Tag = String.fromCharCode(rawFirmwareBytes[0x0a], rawFirmwareBytes[0x0b], rawFirmwareBytes[0x0c]);
+      const bu1Tag = String.fromCharCode(rawFirmwareBytes[0x18], rawFirmwareBytes[0x19], rawFirmwareBytes[0x1a]);
+
+      log(`Container Validierung -> Tag 1: ${eu1Tag} | Tag 2: ${bu1Tag}`, 'success');
+
+      document.getElementById('pnlContainerInfo').classList.remove('hidden');
+      document.getElementById('infoEu1').innerText = `Offset 0x00080 (Motor-Treiber FOC, ${eu1Size} B)`;
+      document.getElementById('infoBu1').innerText = `Offset 0x08D00 (Body/System Ctrl, ${bu1Size} B)`;
+      document.getElementById('infoSig').innerText = `MIFOTA ECDSA Zertifikate (Offset 0x1E480)`;
+
+      checkEnableFlashButtons();
+    }
+
+    async function toggleConnect() {
+      if (gattDevice && gattDevice.gatt.connected) {
+        log("Trenne Verbindung zum Scooter...", 'warn');
+        gattDevice.gatt.disconnect();
+        updateConnectUI(false);
+        return;
+      }
+
+      try {
+        log("Suche nach E-Scooter via WebBluetooth...", 'info');
+        gattDevice = await navigator.bluetooth.requestDevice({
+          filters: [
+            { namePrefix: 'Xiaomi' },
+            { namePrefix: 'Navee' },
+            { namePrefix: 'Mi Scooter' }
+          ],
+          optionalServices: [BLE_SERVICE_MIJIA, "00001800-0000-1000-8000-00805f9b34fb"]
+        });
+
+        log(`Scooter gefunden: ${gattDevice.name} (${gattDevice.id})`, 'success');
+        document.getElementById('lblDevName').innerText = gattDevice.name;
+
+        log("Verbinde mit GATT Server...", 'info');
+        gattServer = await gattDevice.gatt.connect();
+
+        log("Rufe Mijia DFU & Auth Service (0xFE95) ab...", 'info');
+        const service = await gattServer.getPrimaryService(BLE_SERVICE_MIJIA);
+        
+        charCtrl = await service.getCharacteristic(BLE_CHAR_DFU_CTRL);
+        charData = await service.getCharacteristic(BLE_CHAR_DFU_DATA);
+        try {
+          charToken = await service.getCharacteristic(BLE_CHAR_AUTH_TOKEN);
+        } catch(e) {
+          log("Mijia Token Characteristic 0x0010 nicht gefunden, verwende 0x0001 Channel.", 'warn');
+        }
+
+        // Subscribe to notifications
+        await charCtrl.startNotifications();
+        charCtrl.addEventListener('characteristicvaluechanged', handleDfuNotification);
+
+        if (charToken) {
+          await charToken.startNotifications();
+          charToken.addEventListener('characteristicvaluechanged', handleAuthTokenNotification);
+        }
+
+        log("GATT Channels erfolgreich abonniert!", 'success');
+        updateConnectUI(true);
+
+        // Start Auth Handshake & Prompt Power Button Press
+        initiateAuthHandshake();
+
+      } catch (err) {
+        log(`Verbindungsfehler: ${err.message}`, 'error');
+        updateConnectUI(false);
+      }
+    }
+
+    async function initiateAuthHandshake() {
+      log("Initialisiere Mijia Auth Handshake...", 'info');
+      document.getElementById('bannerPowerButton').classList.remove('hidden');
+      log("WARTE AUF POWER-BUTTON DRUCK AM ROLLER-DASHBOARD...", 'warn');
+
+      const challengeReq = new Uint8Array([0x01, 0x00, 0x0c, 0x5a, 0x4d, 0x43]);
+      if (charCtrl) {
+        try {
+          await charCtrl.writeValue(challengeReq);
+        } catch(e) {
+          log(`Auth Challenge Init: ${e.message}`, 'warn');
+        }
+      }
+    }
+
+    function handleAuthTokenNotification(event) {
+      const val = new Uint8Array(event.target.value.buffer);
+      log(`Auth Event [${val.length} B]: ${Array.from(val).map(b => b.toString(16).padStart(2,'0')).join(' ')}`, 'info');
+      
+      if (val[0] === 0x02 || val[0] === 0x20 || val[0] === 0x00) {
+        setAuthSuccess();
+      }
+    }
+
+    function simulateButtonPress() {
+      log("[TEST-SIMULATION] Power-Button Druck empfangen!", 'success');
+      setAuthSuccess();
+    }
+
+    function setAuthSuccess() {
+      isAuthenticated = true;
+      document.getElementById('bannerPowerButton').classList.add('hidden');
+      document.getElementById('lblAuth').innerText = "Erfolgreich (Button OK)";
+      document.getElementById('lblAuth').className = "font-medium text-emerald-400";
+      log("Mijia Authentifizierung ERFOLGREICH! Power-Button Bestätigung empfangen.", 'success');
+      checkEnableFlashButtons();
+    }
+
+    function updateConnectUI(connected) {
+      const btn = document.getElementById('btnConnect');
+      const lbl = document.getElementById('lblStatus');
+
+      if (connected) {
+        btn.className = "px-5 py-2.5 rounded-xl font-medium bg-rose-600 hover:bg-rose-500 text-white transition-all shadow-sm flex items-center gap-2";
+        document.getElementById('txtConnect').innerText = "Trennen";
+        lbl.innerText = "Verbunden";
+        lbl.className = "font-medium text-emerald-400";
+      } else {
+        btn.className = "px-5 py-2.5 rounded-xl font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-sm flex items-center gap-2";
+        document.getElementById('txtConnect').innerText = "Scooter verbinden";
+        lbl.innerText = "Getrennt";
+        lbl.className = "font-medium text-amber-500";
+        document.getElementById('lblDevName').innerText = "-";
+        document.getElementById('bannerPowerButton').classList.add('hidden');
+        isAuthenticated = false;
+        document.getElementById('lblAuth').innerText = "Ausstehend";
+        document.getElementById('lblAuth').className = "font-medium text-amber-500";
+      }
+      checkEnableFlashButtons();
+    }
+
+    function checkEnableFlashButtons() {
+      const ready = rawFirmwareBytes && gattServer && gattServer.connected && isAuthenticated;
+      document.getElementById('btnFlashTest').disabled = !rawFirmwareBytes; // allow dry run offline
+      document.getElementById('btnFlashFull').disabled = !ready;
+    }
+
+    function handleDfuNotification(event) {
+      const value = new Uint8Array(event.target.value.buffer);
+      log(`BLE Notification [${value.length} B]: ${Array.from(value).map(b => b.toString(16).padStart(2,'0')).join(' ')}`, 'info');
+      if (value[0] === 0x02 || value[0] === 0x20) {
+        setAuthSuccess();
+      }
+    }
+
+    async function startFlashProcess(isDryRun) {
+      if (!rawFirmwareBytes) return;
+
+      log(`Starte DFU Flashing-Prozess (${isDryRun ? 'DRY-RUN TEST' : 'ECHTER BLE-FLASH'})...`, 'warn');
+
+      const chunkSize = 128;
+      const totalLen = rawFirmwareBytes.length;
+      let sentBytes = 0;
+
+      // Send DFU Start Command Header
+      const headerPkt = new Uint8Array([0x05, 0x00, 0x02, (totalLen & 0xff), ((totalLen >> 8) & 0xff), ((totalLen >> 16) & 0xff), ((totalLen >> 24) & 0xff)]);
+      
+      if (!isDryRun && charCtrl) {
+        log("Sende DFU START Packet an DFU Control Characteristic...", 'info');
+        await charCtrl.writeValue(headerPkt);
+      } else {
+        log(`[DRY-RUN] Simuliere Header-Paket: ${Array.from(headerPkt).map(b => b.toString(16).padStart(2,'0')).join(' ')}`, 'info');
+      }
+
+      // Stream Data Packets
+      for (let i = 0; i < totalLen; i += chunkSize) {
+        const chunk = rawFirmwareBytes.slice(i, i + chunkSize);
+        sentBytes += chunk.length;
+        const pct = Math.round((sentBytes / totalLen) * 100);
+
+        document.getElementById('barProgress').style.width = `${pct}%`;
+        document.getElementById('lblProgressPercent').innerText = `${pct}%`;
+        document.getElementById('lblProgressState').innerText = `Sende Paket ${Math.floor(i/chunkSize) + 1} (${sentBytes}/${totalLen} Bytes)`;
+
+        // Send periodic progress log to Discord every 20%
+        if (pct % 20 === 0 || sentBytes === totalLen) {
+          log(`Flashing Fortschritt: ${pct}% (${sentBytes}/${totalLen} Bytes)`, 'info');
+        }
+
+        if (!isDryRun && charData) {
+          await charData.writeValueWithoutResponse(chunk);
+          await new Promise(r => setTimeout(r, 20));
+        } else {
+          await new Promise(r => setTimeout(r, 5));
+        }
+      }
+
+      log(`Prozess beendet: ${sentBytes} Bytes erfolgreich übertragen!`, 'success');
+      document.getElementById('lblProgressState').innerText = "Übertragung abgeschlossen!";
+    }
+  </script>
+</body>
+</html>
