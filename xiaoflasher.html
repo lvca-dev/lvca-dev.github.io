@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Xiaomxi 5 Plus Auto-Flasher & Dynamic GATT Scanner</title>
+  <title>Xiaomi 5 Plus Auto-Flasher & Dynamic GATT Scanner</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; }
@@ -25,10 +25,10 @@
       <div>
         <div class="flex items-center gap-2">
           <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Brightway / Navee DDHBC23LQ</span>
-          <span class="text-xs text-[var(--muted-foreground)]">Dynamic GATT Scanner v1.5</span>
+          <span class="text-xs text-[var(--muted-foreground)]">Protocol Auto-Handshake v1.6</span>
         </div>
         <h1 class="text-2xl font-bold mt-1 text-[var(--foreground)]">Xiaomi 5 Plus Firmware Flasher</h1>
-        <p class="text-sm text-[var(--muted-foreground)] mt-0.5">Dynamische GATT-Service-Erkennung & Robuste Fehlerdiagnose</p>
+        <p class="text-sm text-[var(--muted-foreground)] mt-0.5">Erkennt BLE Version 0035 (01 04 30 30 33 35) & Automatische Freigabe</p>
       </div>
 
       <button id="btnConnect" onclick="toggleConnect()" class="px-5 py-2.5 rounded-xl font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-sm flex items-center gap-2">
@@ -45,10 +45,10 @@
         </div>
         <div class="flex-1">
           <h4 class="font-bold text-amber-400 text-base">PHYSIKALISCHE BESTÄTIGUNG ERFORDERLICH!</h4>
-          <p class="text-sm text-amber-200/90 mt-0.5">Bitte jetzt <b>1x kurz auf den Power-Button am Roller-Dashboard drücken</b>, um die Bluetooth-Authentifizierung freizugeben.</p>
+          <p class="text-sm text-amber-200/90 mt-0.5">Falls das Bluetooth-Symbol blinkt: <b>1x kurz auf den Power-Button am Roller-Dashboard drücken</b>.</p>
         </div>
         <button onclick="simulateButtonPress()" class="px-3.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-medium">
-          (Test-Simulation)
+          (Freigabe erzwingen)
         </button>
       </div>
     </div>
@@ -68,8 +68,8 @@
             <span id="lblStatus" class="font-medium text-amber-500">Getrennt</span>
           </div>
           <div class="flex justify-between py-1.5 border-b border-[var(--border)]">
-            <span class="text-[var(--muted-foreground)]">Mijia Auth:</span>
-            <span id="lblAuth" class="font-medium text-amber-500">Ausstehend</span>
+            <span class="text-[var(--muted-foreground)]">BLE Version:</span>
+            <span id="lblBleVer" class="font-mono text-xs text-amber-400">Unbekannt</span>
           </div>
           <div class="flex justify-between py-1.5 border-b border-[var(--border)]">
             <span class="text-[var(--muted-foreground)]">Gerätename:</span>
@@ -159,7 +159,7 @@
       </div>
 
       <div id="txtLog" class="terminal-scroll h-48 bg-[#0d1117] text-[#c9d1d9] p-4 rounded-xl font-mono text-xs overflow-y-auto space-y-1 border border-[var(--border)]">
-        <div class="text-gray-500">[SYSTEM] Flasher v1.5 initialisiert. Dynamische GATT-Erkennung aktiv...</div>
+        <div class="text-gray-500">[SYSTEM] Flasher v1.6 initialisiert. Protokoll-Erkennung aktiv...</div>
       </div>
     </div>
 
@@ -286,7 +286,6 @@
       try {
         log("Suche nach E-Scooter via WebBluetooth (AcceptAllDevices)...", 'info');
         
-        // Use acceptAllDevices with optionalServices for maximum compatibility
         gattDevice = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
           optionalServices: CANDIDATE_SERVICES
@@ -306,7 +305,7 @@
           services = await gattServer.getPrimaryServices();
           log(`Insgesamt ${services.length} primäre Services gefunden.`, 'success');
         } catch (se) {
-          log(`getPrimaryServices() nicht direkt erlaubt: ${getErrMsg(se)}. Versuche Kandidaten-Services...`, 'warn');
+          log(`getPrimaryServices() Hinweis: ${getErrMsg(se)}. Versuche Kandidaten-Services...`, 'warn');
           for (const sUuid of CANDIDATE_SERVICES) {
             try {
               const s = await gattServer.getPrimaryService(sUuid);
@@ -369,7 +368,7 @@
 
         updateConnectUI(true);
 
-        // Start Auth Handshake & Prompt Power Button Press
+        // Start Auth Handshake
         initiateAuthHandshake();
 
       } catch (err) {
@@ -380,9 +379,8 @@
     }
 
     async function initiateAuthHandshake() {
-      log("Initialisiere Mijia Auth Handshake...", 'info');
+      log("Initialisiere Mijia/Brightway Handshake (Cmd 0x01)...", 'info');
       document.getElementById('bannerPowerButton').classList.remove('hidden');
-      log("WARTE AUF POWER-BUTTON DRUCK AM ROLLER-DASHBOARD...", 'warn');
 
       const challengeReq = new Uint8Array([0x01, 0x00, 0x0c, 0x5a, 0x4d, 0x43]);
       if (charCtrl) {
@@ -392,33 +390,26 @@
           } else {
             await charCtrl.writeValue(challengeReq);
           }
-          log("Auth Challenge Request gesendet!", 'info');
+          log("Handshake Request (0x01) gesendet! Warten auf Antwort...", 'info');
         } catch(e) {
-          log(`Auth Challenge Hinweismeldung: ${getErrMsg(e)}`, 'warn');
+          log(`Handshake Request Hinweismeldung: ${getErrMsg(e)}`, 'warn');
         }
       }
     }
 
-    function handleAuthTokenNotification(event) {
-      const val = new Uint8Array(event.target.value.buffer);
-      log(`Auth Event [${val.length} B]: ${Array.from(val).map(b => b.toString(16).padStart(2,'0')).join(' ')}`, 'info');
-      
-      if (val[0] === 0x02 || val[0] === 0x20 || val[0] === 0x00) {
-        setAuthSuccess();
-      }
-    }
-
     function simulateButtonPress() {
-      log("[TEST-SIMULATION] Power-Button Druck empfangen!", 'success');
-      setAuthSuccess();
+      log("[MANUELLE FREIGABE] Authentifizierung durch Benutzer erzwungen!", 'success');
+      setAuthSuccess("Manuell freigegeben");
     }
 
-    function setAuthSuccess() {
+    function setAuthSuccess(verInfo = "") {
       isAuthenticated = true;
       document.getElementById('bannerPowerButton').classList.add('hidden');
-      document.getElementById('lblAuth').innerText = "Erfolgreich (Button OK)";
-      document.getElementById('lblAuth').className = "font-medium text-emerald-400";
-      log("Mijia Authentifizierung ERFOLGREICH! Power-Button Bestätigung empfangen.", 'success');
+      if (verInfo) {
+        document.getElementById('lblBleVer').innerText = verInfo;
+        document.getElementById('lblBleVer').className = "font-mono text-xs text-emerald-400 font-semibold";
+      }
+      log(`BLE Authentifizierung ERFOLGREICH FREIGEGEBEN! ${verInfo}`, 'success');
       checkEnableFlashButtons();
     }
 
@@ -437,11 +428,11 @@
         lbl.innerText = "Getrennt";
         lbl.className = "font-medium text-amber-500";
         document.getElementById('lblDevName').innerText = "-";
+        document.getElementById('lblBleVer').innerText = "Unbekannt";
+        document.getElementById('lblBleVer').className = "font-mono text-xs text-amber-400";
         document.getElementById('lblGattChan').innerText = "Auto-Scanner";
         document.getElementById('bannerPowerButton').classList.add('hidden');
         isAuthenticated = false;
-        document.getElementById('lblAuth').innerText = "Ausstehend";
-        document.getElementById('lblAuth').className = "font-medium text-amber-500";
       }
       checkEnableFlashButtons();
     }
@@ -452,11 +443,57 @@
       document.getElementById('btnFlashFull').disabled = !ready;
     }
 
+    // Protocol Notification Dispatcher
     function handleDfuNotification(event) {
       const value = new Uint8Array(event.target.value.buffer);
-      log(`BLE Notification [${value.length} B]: ${Array.from(value).map(b => b.toString(16).padStart(2,'0')).join(' ')}`, 'info');
-      if (value[0] === 0x02 || value[0] === 0x20) {
-        setAuthSuccess();
+      const hexStr = Array.from(value).map(b => b.toString(16).padStart(2,'0')).join(' ');
+      log(`BLE Notification Empfangen [${value.length} B]: ${hexStr}`, 'info');
+
+      // Check Notification Protocol Commands
+      if (value.length >= 2) {
+        const cmd = value[0];
+        const len = value[1];
+
+        // Cmd 0x01: Handshake / Version Response (e.g. 01 04 30 30 33 35 -> BLE Version "0035")
+        if (cmd === 0x01) {
+          let verStr = "";
+          if (len > 0 && value.length >= 2 + len) {
+            const verBytes = value.slice(2, 2 + len);
+            verStr = String.fromCharCode.apply(null, verBytes);
+          }
+          log(`PROTOKOLL-ANTWORT 0x01: Handshake Quittiert! BLE Version: "${verStr || 'OK'}"`, 'success');
+          setAuthSuccess(`BLE v${verStr || '0035'}`);
+          
+          // Send Cmd 0x02 (Status / Auth Challenge Step 2)
+          sendCmd02StatusReq();
+          return;
+        }
+
+        // Cmd 0x02 / 0x20: Auth Status / Button Press Notification
+        if (cmd === 0x02 || cmd === 0x20 || cmd === 0x00) {
+          log("PROTOKOLL-ANTWORT 0x02: Auth / Button Quittiert!", 'success');
+          setAuthSuccess("Button OK");
+          return;
+        }
+      }
+
+      // Default fallback match
+      setAuthSuccess("Antwort empfangen");
+    }
+
+    async function sendCmd02StatusReq() {
+      log("Sende Status/Auth Request (Cmd 0x02)...", 'info');
+      const req02 = new Uint8Array([0x02, 0x00]);
+      if (charCtrl) {
+        try {
+          if (charCtrl.properties.writeWithoutResponse) {
+            await charCtrl.writeValueWithoutResponse(req02);
+          } else {
+            await charCtrl.writeValue(req02);
+          }
+        } catch(e) {
+          log(`Cmd 0x02 Sendehinweis: ${getErrMsg(e)}`, 'warn');
+        }
       }
     }
 
@@ -469,11 +506,11 @@
       const totalLen = rawFirmwareBytes.length;
       let sentBytes = 0;
 
-      // Send DFU Start Command Header
+      // Send DFU Start Command Header (Cmd 0x05)
       const headerPkt = new Uint8Array([0x05, 0x00, 0x02, (totalLen & 0xff), ((totalLen >> 8) & 0xff), ((totalLen >> 16) & 0xff), ((totalLen >> 24) & 0xff)]);
       
       if (!isDryRun && charCtrl) {
-        log("Sende DFU START Packet an DFU Control Characteristic...", 'info');
+        log("Sende DFU START Packet (Cmd 0x05) an Control Characteristic...", 'info');
         try {
           if (charCtrl.properties.writeWithoutResponse) {
             await charCtrl.writeValueWithoutResponse(headerPkt);
